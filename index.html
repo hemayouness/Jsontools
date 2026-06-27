@@ -14,9 +14,8 @@
         }
 
         button {
-            display: block;
             margin: 10px 5px;
-            padding: 10px 20px;
+            padding: 10px 15px;
         }
 
         select {
@@ -48,7 +47,8 @@
     </select>
 </div>
 
-<button onclick="merge()">Merge</button>
+<button onclick="merge(false)">Merge</button>
+<button onclick="merge(true)">Merge + Sort Properties</button>
 
 <h3>Output</h3>
 <textarea id="output" readonly></textarea>
@@ -130,17 +130,38 @@ function deepMerge(base, override, arrayMode) {
     return base;
 }
 
+function sortObject(obj) {
+    if (Array.isArray(obj)) {
+        return obj.map(sortObject);
+    }
+
+    if (obj !== null && typeof obj === "object") {
+        return Object.keys(obj)
+            .sort()
+            .reduce((res, key) => {
+                res[key] = sortObject(obj[key]);
+                return res;
+            }, {});
+    }
+
+    return obj;
+}
+
 function parseJSONC(text) {
     return JSON.parse(stripComments(text || "{}"));
 }
 
-function merge() {
+function merge(shouldSort) {
     try {
         const base = parseJSONC(document.getElementById("base").value);
         const override = parseJSONC(document.getElementById("override").value);
         const mode = document.getElementById("arrayMode").value;
 
-        const result = deepMerge(base, override, mode);
+        let result = deepMerge(base, override, mode);
+
+        if (shouldSort) {
+            result = sortObject(result);
+        }
 
         document.getElementById("output").value =
             JSON.stringify(result, null, 2);
