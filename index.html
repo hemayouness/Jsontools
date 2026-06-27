@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AppSettings JSONC Merger</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+
+        textarea {
+            width: 45%;
+            height: 300px;
+            margin: 5px;
+            font-family: monospace;
+        }
+
+        button {
+            display: block;
+            margin: 10px 5px;
+            padding: 10px 20px;
+        }
+
+        select {
+            margin: 10px 5px;
+            padding: 5px;
+        }
+
+        #output {
+            width: 92%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>AppSettings JSONC Merger</h2>
+
+<div>
+    <textarea id="base" placeholder="Base JSON (comments supported)"></textarea>
+    <textarea id="override" placeholder="Override JSON (comments supported)"></textarea>
+</div>
+
+<div>
+    <label>Array mode:</label>
+    <select id="arrayMode">
+        <option value="replace">Replace</option>
+        <option value="union">Union</option>
+        <option value="concat">Concat</option>
+    </select>
+</div>
+
+<button onclick="merge()">Merge</button>
+
+<h3>Output</h3>
+<textarea id="output" readonly></textarea>
+
+<script>
+function stripComments(json) {
+    let result = "";
+    let inString = false;
+    let stringChar = "";
+    let inBlock = false;
+
+    for (let i = 0; i < json.length; i++) {
+        const c = json[i];
+        const n = json[i + 1];
+
+        if (!inBlock && (c === '"' || c === "'")) {
+            if (!inString) {
+                inString = true;
+                stringChar = c;
+            } else if (stringChar === c) {
+                inString = false;
+                stringChar = "";
+            }
+        }
+
+        if (inBlock) {
+            if (c === "*" && n === "/") {
+                inBlock = false;
+                i++;
+            }
+            continue;
+        }
+
+        if (!inString && c === "/" && n === "*") {
+            inBlock = true;
+            i++;
+            continue;
+        }
+
+        if (!inString && c === "/" && n === "/") {
+            while (i < json.length && json[i] !== "\n") i++;
+            continue;
+        }
+
+        result += c;
+    }
+
+    return result;
+}
+
+function mergeArrays(a, b, mode) {
+    if (mode === "replace") return b;
+    if (mode === "concat") return a.concat(b);
+    if (mode === "union") return [...new Set([...a, ...b])];
+    return b;
+}
+
+function deepMerge(base, override, arrayMode) {
+    for (const key in override) {
+
+        if (Array.isArray(base[key]) && Array.isArray(override[key])) {
+            base[key] = mergeArrays(base[key], override[key], arrayMode);
+            continue;
+        }
+
+        if (
+            base[key] &&
+            typeof base[key] === "object" &&
+            typeof override[key] === "object" &&
+            !Array.isArray(base[key]) &&
+            !Array.isArray(override[key])
+        ) {
+            base[key] = deepMerge(base[key], override[key], arrayMode);
+        } else {
+            base[key] = override[key];
+        }
+    }
+
+    return base;
+}
+
+function parseJSONC(text) {
+    return JSON.parse(stripComments(text || "{}"));
+}
+
+function merge() {
+    try {
+        const base = parseJSONC(document.getElementById("base").value);
+        const override = parseJSONC(document.getElementById("override").value);
+        const mode = document.getElementById("arrayMode").value;
+
+        const result = deepMerge(base, override, mode);
+
+        document.getElementById("output").value =
+            JSON.stringify(result, null, 2);
+
+    } catch (e) {
+        document.getElementById("output").value =
+            "ERROR:\n" + e.message;
+    }
+}
+</script>
+
+</body>
+</html>
